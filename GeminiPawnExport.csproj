@@ -48,6 +48,10 @@
     <Reference Include="UnityEngine.IMGUIModule">
       <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
     </Reference>
+    <Reference Include="UnityEngine.TextRenderingModule, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Class1.cs" />
@@ -55,6 +59,7 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="About\About.xml" />
+    <Content Include="Defs\MainButtonDef.xml" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
@@ -69,6 +74,6 @@ xcopy /y /q "$(TargetDir)*.dll" %25MOD_DIR%25\Assemblies\
 xcopy /y /q "$(ProjectDir)About\About.xml" %25MOD_DIR%25\About\
 
 :: 4. (Optional) Auto-copy Defs or Textures if you add them later
-:: xcopy /y /s /q "$(ProjectDir)Defs" %25MOD_DIR%25\Defs\</PostBuildEvent>
+xcopy /y /s /q "$(ProjectDir)Defs" %25MOD_DIR%25\Defs\</PostBuildEvent>
   </PropertyGroup>
 </Project>

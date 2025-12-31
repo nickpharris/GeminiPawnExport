@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<Defs>
+	<MainButtonDef>
+		<defName>GeminiExport_MainButton</defName>
+		<label>Gemini</label>
+		<description>Export colonist data for analysis.</description>
+		<tabWindowClass>MyRimWorldMod.MainTabWindow_GeminiExport</tabWindowClass>
+		<order>99</order>
+	</MainButtonDef>
+</Defs>
