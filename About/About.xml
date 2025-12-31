@@ -9,5 +9,5 @@
 	<li>1.6</li>
   </supportedVersions>
   <packageId>NickH.GeminiExport</packageId>
-  <description>Exports pawn data to clipboard for LLM analysis.</description>
+  <description>Puts pawn data on the console for use in LLM analysis. Includes pawn details (shooting, melee and animals skills; health details; weapons; armor / clothing), additional colony weapons and additional colony armor / clothing.</description>
 </ModMetaData>

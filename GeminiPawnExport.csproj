@@ -57,4 +57,18 @@
     <Content Include="About\About.xml" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>:: 1. Set your RimWorld Mod Directory Variable (CHANGE THIS PATH!)
+set MOD_DIR="C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\GeminiExport"
+
+:: 2. Copy the compiled DLLs (The code)
+xcopy /y /q "$(TargetDir)*.dll" %25MOD_DIR%25\Assemblies\
+
+:: 3. Copy the About.xml (The metadata)
+:: We use ProjectDir because About.xml is source code, not build output
+xcopy /y /q "$(ProjectDir)About\About.xml" %25MOD_DIR%25\About\
+
+:: 4. (Optional) Auto-copy Defs or Textures if you add them later
+:: xcopy /y /s /q "$(ProjectDir)Defs" %25MOD_DIR%25\Defs\</PostBuildEvent>
+  </PropertyGroup>
 </Project>
