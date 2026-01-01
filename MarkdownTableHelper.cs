@@ -34,6 +34,7 @@ namespace GeminiPawnExport
 
         public override float CalculateHeight(float width)
         {
+            // Text.CalcHeight handles newlines (\n) correctly, calculating the vertical space needed.
             return Text.CalcHeight(Content, width);
         }
 
@@ -119,7 +120,6 @@ namespace GeminiPawnExport
                 for (int i = 0; i < row.Count && i < colCount; i++)
                 {
                     Rect cellRect = new Rect(outRect.x + (i * colWidth), currentY, colWidth, rowHeight);
-                    // ContractBy provides padding
                     Widgets.Label(cellRect.ContractedBy(4f), row[i]);
                     Widgets.DrawLineVertical(cellRect.x + cellRect.width, cellRect.y, rowHeight);
                 }
@@ -141,7 +141,9 @@ namespace GeminiPawnExport
             var blocks = new List<DisplayBlock>();
             if (string.IsNullOrEmpty(markdown)) return blocks;
 
-            var lines = markdown.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+            // CHANGED: Use StringSplitOptions.None to PRESERVE empty lines.
+            // This ensures that "Paragraph 1 \n \n Paragraph 2" stays separated.
+            var lines = markdown.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
 
             List<string> textBuffer = new List<string>();
             List<string> tableBuffer = new List<string>();
@@ -151,7 +153,10 @@ namespace GeminiPawnExport
             foreach (var line in lines)
             {
                 string trimmed = line.Trim();
-                bool isTableLine = trimmed.StartsWith("|"); // Simple check for Markdown table
+
+                // A line is a table row ONLY if it starts with | AND is not empty.
+                // (Empty lines break the table, which is standard Markdown behavior)
+                bool isTableLine = !string.IsNullOrWhiteSpace(trimmed) && trimmed.StartsWith("|");
 
                 if (isTableLine)
                 {
@@ -171,7 +176,7 @@ namespace GeminiPawnExport
                 {
                     if (inTable)
                     {
-                        // Switching from Table to Text
+                        // Switching from Table to Text (or simple empty line ending the table)
                         if (tableBuffer.Count > 0)
                         {
                             var tb = CreateTableBlock(tableBuffer);
@@ -180,7 +185,8 @@ namespace GeminiPawnExport
                         }
                         inTable = false;
                     }
-                    textBuffer.Add(line); // Keep original whitespace for text
+                    // Add the raw line to text buffer (preserves whitespace/empty lines)
+                    textBuffer.Add(line);
                 }
             }
 
@@ -197,20 +203,22 @@ namespace GeminiPawnExport
 
         private static TextBlock CreateTextBlock(List<string> lines)
         {
+            // Join with newline. Since 'lines' now includes empty strings for blank lines,
+            // this will create double newlines (\n\n) where appropriate.
             string raw = string.Join("\n", lines);
+
             // Basic Markdown Cleanup
 
             // Bold **text** -> <b>text</b>
-            // Note: This is a simple regex replacer. Nested tags might fail, but usually fine for LLM output.
             string processed = Regex.Replace(raw, @"\*\*(.*?)\*\*", "<b>$1</b>");
 
-            // Italics *text* -> <i>text</i> (Basic check to avoid bullet points)
+            // Italics *text* -> <i>text</i>
             processed = Regex.Replace(processed, @"(?<!\*)\*(?!\*)(.*?)\*", "<i>$1</i>");
 
-            // Bullet points
+            // Bullet points (convert "  * item" or "- item" to " • item")
             processed = Regex.Replace(processed, @"^\s*[\-\*]\s+", " • ", RegexOptions.Multiline);
 
-            // Headers ## Header -> <b>Header</b>
+            // Headers ## Header -> Size 16 Bold
             processed = Regex.Replace(processed, @"^#+\s+(.*)", "<b><size=16>$1</size></b>", RegexOptions.Multiline);
 
             return new TextBlock(processed);
@@ -222,16 +230,14 @@ namespace GeminiPawnExport
 
             foreach (var line in lines)
             {
-                // Identify lines that look like table rows: "| Cell | Cell |"
                 if (line.StartsWith("|"))
                 {
-                    // Remove leading/trailing pipes and split
                     var cells = line.Split('|')
                         .Skip(1).Take(line.Split('|').Length - 2)
                         .Select(c => CleanCell(c))
                         .ToList();
 
-                    // Detect separator lines (e.g., "|---|---|") and skip them
+                    // Detect separator lines (e.g., "|---|---|")
                     bool isSeparator = cells.All(c => string.IsNullOrWhiteSpace(c) || c.All(ch => ch == '-' || ch == ':' || char.IsWhiteSpace(ch)));
 
                     if (isSeparator) continue;
@@ -243,15 +249,14 @@ namespace GeminiPawnExport
                 }
             }
 
-            if (block.Headers.Count == 0) return null; // Invalid table
+            if (block.Headers.Count == 0) return null;
             return block;
         }
 
         private static string CleanCell(string raw)
         {
             string clean = raw.Trim();
-            // Convert Markdown bold to RimWorld RichText within cells
-            clean = clean.Replace("**", ""); // Strip stars in tables to save space/complexity
+            clean = clean.Replace("**", "");
             return clean;
         }
     }
