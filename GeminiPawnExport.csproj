@@ -54,7 +54,10 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Class1.cs" />
+    <Compile Include="GeminiExportWindow.cs" />
+    <Compile Include="GeminiAPIManager.cs" />
+    <Compile Include="GeminiMod.cs" />
+    <Compile Include="GeminiSettings.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
