@@ -58,26 +58,26 @@ namespace GeminiPawnExport
             // --- 3. Draw Top Bar ---
             float curX = topBarRect.x;
 
-            // SEND
+            // Send prompt and data to Gemini
             if (Widgets.ButtonText(new Rect(curX, topBarRect.y, 120f, 30f), "Send to Gemini"))
             {
                 SendPawnDataToGemini();
             }
             curX += 130f;
 
-            // RESET
-            if (Widgets.ButtonText(new Rect(curX, topBarRect.y, 100f, 30f), "Reset Prompt"))
+            // Reset to default prompt
+            if (Widgets.ButtonText(new Rect(curX, topBarRect.y, 120f, 30f), "Reset Prompt"))
             {
                 promptText = GeminiMod.settings.defaultPrompt;
             }
-            curX += 110f;
+            curX += 130f;
 
-            // SETTINGS
-            if (Widgets.ButtonText(new Rect(curX, topBarRect.y, 100f, 30f), "Settings"))
+            // Open mod settings
+            if (Widgets.ButtonText(new Rect(curX, topBarRect.y, 120f, 30f), "Settings"))
             {
                 Find.WindowStack.Add(new Dialog_ModSettings(LoadedModManager.GetMod<GeminiMod>()));
             }
-            curX += 110f;
+            curX += 130f;
 
             // --- NEW: DEV MODE DEBUG BUTTON ---
             // Only visible if Dev Mode is enabled in RimWorld options
@@ -90,10 +90,10 @@ namespace GeminiPawnExport
                 curX += 130f;
             }
 
-            // COPY
+            // Copy Gemini response to clipboard
             if (!string.IsNullOrEmpty(rawResponse))
             {
-                // This floats to the right of the last button (Settings or Debug depending on DevMode)
+
                 if (Widgets.ButtonText(new Rect(curX, topBarRect.y, 120f, 30f), "Copy Results"))
                 {
                     GUIUtility.systemCopyBuffer = rawResponse;
@@ -189,16 +189,16 @@ namespace GeminiPawnExport
             Messages.Message("Payload logged to Dev Console.", MessageTypeDefOf.TaskCompletion, false);
         }
 
-        private string GetTraits(Pawn p)
-        {
-            if (p.story == null || p.story.traits == null) return "";
-            List<string> traits = new List<string>();
-            foreach (var t in p.story.traits.allTraits)
-            {
-                traits.Add(t.Label);
-            }
-            return string.Join(", ", traits);
-        }
+        //private string GetTraits(Pawn p)
+        //{
+        //    if (p.story == null || p.story.traits == null) return "";
+        //    List<string> traits = new List<string>();
+        //    foreach (var t in p.story.traits.allTraits)
+        //    {
+        //        traits.Add(t.Label);
+        //    }
+        //    return string.Join(", ", traits);
+        //}
 
         private void OnGeminiResponseReceived(string response)
         {
