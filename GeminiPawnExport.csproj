@@ -54,6 +54,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ColonyDataExtract.cs" />
     <Compile Include="GeminiExportWindow.cs" />
     <Compile Include="GeminiAPIManager.cs" />
     <Compile Include="GeminiMod.cs" />

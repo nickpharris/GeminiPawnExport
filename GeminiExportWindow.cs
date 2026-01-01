@@ -166,12 +166,15 @@ namespace GeminiPawnExport
         // extracted from SendPawnDataToGemini so the Debug button can reuse it
         private string GeneratePawnData()
         {
-            StringBuilder sb = new StringBuilder();
-            foreach (Pawn pawn in Find.CurrentMap.mapPawns.FreeColonists)
-            {
-                sb.AppendLine($"Name: {pawn.Name.ToStringShort}, Skills: Shooting {pawn.skills.GetSkill(SkillDefOf.Shooting).Level}, Melee {pawn.skills.GetSkill(SkillDefOf.Melee).Level}, Traits: {GetTraits(pawn)}");
-            }
-            return sb.ToString();
+            //Use the new helper class (brought back from the original implementation)
+            return GeminiExporter.GenerateReport();
+
+            //StringBuilder sb = new StringBuilder();
+            //foreach (Pawn pawn in Find.CurrentMap.mapPawns.FreeColonists)
+            //{
+            //    sb.AppendLine($"Name: {pawn.Name.ToStringShort}, Skills: Shooting {pawn.skills.GetSkill(SkillDefOf.Shooting).Level}, Melee {pawn.skills.GetSkill(SkillDefOf.Melee).Level}, Traits: {GetTraits(pawn)}");
+            //}
+            //return sb.ToString();
         }
 
         // --- NEW Debug Action ---
