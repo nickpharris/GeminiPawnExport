@@ -210,6 +210,13 @@ namespace GeminiPawnExport
 
         private void ProcessResponse(string response)
         {
+
+            //If dev mode is on, dump the raw response to the log
+            if (Prefs.DevMode)
+            {
+                Log.Message("Raw response from Gemini:\n" + response);
+            }
+
             this.rawResponse = response;
             // Parse full mixed content
             this.displayBlocks = MarkdownParser.Parse(response);
