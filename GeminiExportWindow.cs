@@ -77,11 +77,23 @@ namespace GeminiPawnExport
             {
                 Find.WindowStack.Add(new Dialog_ModSettings(LoadedModManager.GetMod<GeminiMod>()));
             }
+            curX += 110f;
+
+            // --- NEW: DEV MODE DEBUG BUTTON ---
+            // Only visible if Dev Mode is enabled in RimWorld options
+            if (Prefs.DevMode)
+            {
+                if (Widgets.ButtonText(new Rect(curX, topBarRect.y, 120f, 30f), "Debug Payload"))
+                {
+                    DebugDumpData();
+                }
+                curX += 130f;
+            }
 
             // COPY
             if (!string.IsNullOrEmpty(rawResponse))
             {
-                curX += 110f;
+                // This floats to the right of the last button (Settings or Debug depending on DevMode)
                 if (Widgets.ButtonText(new Rect(curX, topBarRect.y, 120f, 30f), "Copy Results"))
                 {
                     GUIUtility.systemCopyBuffer = rawResponse;
@@ -144,13 +156,34 @@ namespace GeminiPawnExport
             this.rawResponse = "Collecting data and sending to API... please wait.";
             this.displayBlocks = null;
 
+            // CHANGED: Use the helper method to get data
+            string pawnData = GeneratePawnData();
+
+            GeminiAPIManager.SendRequest(promptText, pawnData, OnGeminiResponseReceived);
+        }
+
+        // --- NEW Helper Method to Generate Data ---
+        // extracted from SendPawnDataToGemini so the Debug button can reuse it
+        private string GeneratePawnData()
+        {
             StringBuilder sb = new StringBuilder();
             foreach (Pawn pawn in Find.CurrentMap.mapPawns.FreeColonists)
             {
                 sb.AppendLine($"Name: {pawn.Name.ToStringShort}, Skills: Shooting {pawn.skills.GetSkill(SkillDefOf.Shooting).Level}, Melee {pawn.skills.GetSkill(SkillDefOf.Melee).Level}, Traits: {GetTraits(pawn)}");
             }
+            return sb.ToString();
+        }
 
-            GeminiAPIManager.SendRequest(promptText, sb.ToString(), OnGeminiResponseReceived);
+        // --- NEW Debug Action ---
+        private void DebugDumpData()
+        {
+            string data = GeneratePawnData();
+
+            // Log to RimWorld Console (Dev Log)
+            Log.Message("<b>[GeminiExport] Generated Payload:</b>\n" + data);
+
+            // Show a small notification so you know it happened
+            Messages.Message("Payload logged to Dev Console.", MessageTypeDefOf.TaskCompletion, false);
         }
 
         private string GetTraits(Pawn p)
