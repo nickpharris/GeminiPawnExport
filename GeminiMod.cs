@@ -1,7 +1,7 @@
 ﻿using UnityEngine;
 using Verse;
 
-namespace MyRimWorldMod
+namespace GeminiPawnExport
 {
     public class GeminiMod : Mod
     {
@@ -23,6 +23,7 @@ namespace MyRimWorldMod
             listingStandard.Gap();
 
             listingStandard.Label("Default Analysis Prompt:");
+            // Increased height for prompt entry
             settings.defaultPrompt = listingStandard.TextEntry(settings.defaultPrompt, 4);
 
             listingStandard.End();

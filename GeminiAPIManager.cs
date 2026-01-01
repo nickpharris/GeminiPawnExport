@@ -5,30 +5,48 @@ using System.Threading.Tasks;
 using System.Text.RegularExpressions;
 using Verse;
 
-namespace MyRimWorldMod
+namespace GeminiPawnExport
 {
     public static class GeminiAPIManager
     {
         private static readonly HttpClient client = new HttpClient();
         private const string Endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent";
 
-        public static async Task<string> AskGemini(string prompt, string data, string apiKey)
+        /// <summary>
+        /// Sends the request to Gemini asynchronously and invokes the callback on completion.
+        /// </summary>
+        public static void SendRequest(string prompt, string pawnData, Action<string> callback)
         {
+            string apiKey = GeminiMod.settings.apiKey;
+
             if (string.IsNullOrEmpty(apiKey))
             {
-                return "Error: API Key is missing. Please configure it in Mod Settings.";
+                callback?.Invoke("Error: API Key is missing. Please configure it in Mod Settings.");
+                return;
             }
 
+            // Run on a background thread to avoid freezing the UI
+            Task.Run(async () =>
+            {
+                string result = await AskGemini(prompt, pawnData, apiKey);
+                callback?.Invoke(result);
+            });
+        }
+
+        private static async Task<string> AskGemini(string prompt, string data, string apiKey)
+        {
             try
             {
-                // Combine prompt and data
                 string fullContent = $"{prompt}\n\nDATA:\n{data}";
 
-                // Escape quotes for JSON
-                string jsonContent = fullContent.Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "");
+                // Manual JSON escaping
+                string escapedContent = fullContent
+                    .Replace("\\", "\\\\")
+                    .Replace("\"", "\\\"")
+                    .Replace("\n", "\\n")
+                    .Replace("\r", "");
 
-                // Construct JSON payload manually to avoid Newtonsoft.Json dependency
-                string jsonPayload = $"{{\"contents\": [{{\"parts\": [{{\"text\": \"{jsonContent}\"}}]}}]}}";
+                string jsonPayload = $"{{\"contents\": [{{\"parts\": [{{\"text\": \"{escapedContent}\"}}]}}]}}";
 
                 var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
                 string url = $"{Endpoint}?key={apiKey}";
@@ -53,21 +71,15 @@ namespace MyRimWorldMod
 
         private static string ParseGeminiResponse(string json)
         {
-            // Simple regex to extract the "text" field from the JSON response
-            // Response structure: "text": "ACTUAL CONTENT"
-            // We look for the pattern and extract the group.
-
-            // Regex explanation: Match "text": " then capture everything until the next unescaped quote
             var match = Regex.Match(json, "\"text\":\\s*\"((?:[^\"\\\\]|\\\\.)*)\"");
 
             if (match.Success)
             {
                 string encoded = match.Groups[1].Value;
-                // Unescape JSON characters (like \n, \", etc.)
                 return Regex.Unescape(encoded);
             }
 
-            return "Error: Could not parse response from Gemini.";
+            return "Error: Could not parse response from Gemini. Raw: " + json;
         }
     }
 }

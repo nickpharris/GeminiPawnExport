@@ -1,5 +1,4 @@
-﻿using MyRimWorldMod;
-using RimWorld;
+﻿using RimWorld;
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
@@ -9,133 +8,149 @@ namespace GeminiPawnExport
 {
     public class MainTabWindow_GeminiExport : MainTabWindow
     {
-        private string currentPrompt = "Waiting for input...";
-        private CachedTableData currentTableData;
-        private Vector2 scrollPosition = Vector2.zero; // Tracks scrollbar position
+        // UI State
+        private string promptText = "";
+        private string rawResponse = "Ready to generate.";
+        private List<DisplayBlock> displayBlocks;
+        private Vector2 scrollPosition = Vector2.zero;
+
+        // Thread-safe handling
+        private object responseLock = new object();
+        private string pendingResponse = null;
 
         public override Vector2 InitialSize => new Vector2(800f, 600f);
 
+        public override void PreOpen()
+        {
+            base.PreOpen();
+            // Load the default prompt from settings when the window opens
+            if (string.IsNullOrEmpty(promptText))
+            {
+                promptText = GeminiMod.settings.defaultPrompt;
+            }
+        }
+
         public override void DoWindowContents(Rect inRect)
         {
-            // Title and Controls Area (Top 50 pixels)
-            Rect controlsRect = new Rect(inRect.x, inRect.y, inRect.width, 40f);
+            // --- 1. Handle Async Responses (Thread Safety) ---
+            string newResponse = null;
+            lock (responseLock)
+            {
+                if (pendingResponse != null)
+                {
+                    newResponse = pendingResponse;
+                    pendingResponse = null;
+                }
+            }
+            if (newResponse != null) ProcessResponse(newResponse);
 
-            if (Widgets.ButtonText(new Rect(controlsRect.x, controlsRect.y, 150f, 30f), "Send to Gemini"))
+
+            // --- 2. Layout Definitions ---
+            Rect topBarRect = new Rect(inRect.x, inRect.y, inRect.width, 30f);
+
+            Rect promptLabelRect = new Rect(inRect.x, topBarRect.yMax + 10f, inRect.width, 20f);
+            Rect promptBoxRect = new Rect(inRect.x, promptLabelRect.yMax, inRect.width, 60f);
+
+            float dividerY = promptBoxRect.yMax + 10f;
+            Rect outRect = new Rect(inRect.x, dividerY + 10f, inRect.width, inRect.height - (dividerY + 10f));
+
+
+            // --- 3. Draw Top Bar ---
+            float curX = topBarRect.x;
+
+            // SEND
+            if (Widgets.ButtonText(new Rect(curX, topBarRect.y, 120f, 30f), "Send to Gemini"))
             {
                 SendPawnDataToGemini();
             }
+            curX += 130f;
 
-            // Main Content Area (Rest of the window)
-            Rect outRect = new Rect(inRect.x, inRect.y + 50f, inRect.width, inRect.height - 50f);
-
-            // Determine content height for the scroll view
-            float viewHeight = 0f;
-            if (currentTableData != null && currentTableData.IsValid)
+            // RESET
+            if (Widgets.ButtonText(new Rect(curX, topBarRect.y, 100f, 30f), "Reset Prompt"))
             {
-                // Calculate table height based on current width
-                // We divide by column count, subtracting a bit for the scrollbar width (16f)
-                float colWidth = (inRect.width - 20f) / currentTableData.Headers.Count;
-                viewHeight = currentTableData.CalculateTotalHeight(colWidth);
+                promptText = GeminiMod.settings.defaultPrompt;
+            }
+            curX += 110f;
+
+            // SETTINGS
+            if (Widgets.ButtonText(new Rect(curX, topBarRect.y, 100f, 30f), "Settings"))
+            {
+                Find.WindowStack.Add(new Dialog_ModSettings(LoadedModManager.GetMod<GeminiMod>()));
+            }
+
+            // COPY
+            if (!string.IsNullOrEmpty(rawResponse))
+            {
+                curX += 110f;
+                if (Widgets.ButtonText(new Rect(curX, topBarRect.y, 120f, 30f), "Copy Results"))
+                {
+                    GUIUtility.systemCopyBuffer = rawResponse;
+                    Messages.Message("Copied to clipboard.", MessageTypeDefOf.TaskCompletion, false);
+                }
+            }
+
+            // --- 4. Draw Prompt Input ---
+            Widgets.Label(promptLabelRect, "<b>Analysis Prompt:</b>");
+            promptText = Widgets.TextArea(promptBoxRect, promptText);
+
+            // --- 5. Draw Results Area ---
+            Widgets.DrawLineHorizontal(inRect.x, dividerY, inRect.width);
+
+            // Calculate content height
+            float viewHeight = 0f;
+            float viewWidth = outRect.width - 16f; // Account for scrollbar
+
+            if (displayBlocks != null && displayBlocks.Count > 0)
+            {
+                foreach (var block in displayBlocks)
+                {
+                    viewHeight += block.CalculateHeight(viewWidth);
+                    viewHeight += 10f; // Gap between blocks
+                }
             }
             else
             {
-                // Fallback text height
-                viewHeight = Text.CalcHeight(currentPrompt, inRect.width - 16f) + 20f;
+                viewHeight = Text.CalcHeight(rawResponse, viewWidth) + 20f;
             }
 
-            Rect viewRect = new Rect(0f, 0f, inRect.width - 16f, viewHeight);
+            Rect viewRect = new Rect(0f, 0f, viewWidth, viewHeight);
 
-            // Begin Scroll View
             Widgets.BeginScrollView(outRect, ref scrollPosition, viewRect, true);
 
-            if (currentTableData != null && currentTableData.IsValid)
+            if (displayBlocks != null && displayBlocks.Count > 0)
             {
-                DrawTable(viewRect);
+                float curY = 0f;
+                foreach (var block in displayBlocks)
+                {
+                    float h = block.CalculateHeight(viewWidth);
+                    Rect blockRect = new Rect(0f, curY, viewWidth, h);
+
+                    block.Draw(blockRect);
+
+                    curY += h + 10f; // Add gap
+                }
             }
             else
             {
-                Widgets.Label(viewRect, currentPrompt);
+                // Fallback for raw text or status messages
+                Widgets.Label(viewRect, rawResponse);
             }
 
             Widgets.EndScrollView();
         }
 
-        private void DrawTable(Rect outRect)
-        {
-            // 1. Switch to Tiny font for denser data
-            GameFont originalFont = Text.Font;
-            Text.Font = GameFont.Tiny;
-
-            int colCount = currentTableData.Headers.Count;
-            float colWidth = outRect.width / colCount;
-            float currentY = outRect.y;
-
-            // --- Draw Headers ---
-            float headerHeight = 30f;
-            for (int i = 0; i < colCount; i++)
-            {
-                Rect cellRect = new Rect(outRect.x + (i * colWidth), currentY, colWidth, headerHeight);
-
-                // Highlight header background
-                Widgets.DrawHighlight(cellRect);
-
-                // Center text for headers
-                Text.Anchor = TextAnchor.MiddleCenter;
-                Widgets.Label(cellRect, currentTableData.Headers[i]);
-                Text.Anchor = TextAnchor.UpperLeft;
-
-                // Vertical divider
-                Widgets.DrawLineVertical(cellRect.x + cellRect.width, cellRect.y, cellRect.height);
-            }
-
-            currentY += headerHeight;
-            Widgets.DrawLineHorizontal(outRect.x, currentY, outRect.width);
-
-            // --- Draw Rows ---
-            foreach (var row in currentTableData.Rows)
-            {
-                // 1. Calculate max height required for this row (based on wrapping text)
-                float maxRowHeight = 24f; // Minimum height
-                for (int i = 0; i < row.Count && i < colCount; i++)
-                {
-                    float h = Text.CalcHeight(row[i], colWidth);
-                    if (h > maxRowHeight) maxRowHeight = h;
-                }
-
-                // 2. Draw Cells
-                for (int i = 0; i < row.Count && i < colCount; i++)
-                {
-                    Rect cellRect = new Rect(outRect.x + (i * colWidth), currentY, colWidth, maxRowHeight);
-
-                    // ContractBy(4f) adds padding so text doesn't touch the lines
-                    Widgets.Label(cellRect.ContractedBy(4f), row[i]);
-
-                    Widgets.DrawLineVertical(cellRect.x + cellRect.width, cellRect.y, maxRowHeight);
-                }
-
-                currentY += maxRowHeight;
-                Widgets.DrawLineHorizontal(outRect.x, currentY, outRect.width);
-            }
-
-            // Restore original font
-            Text.Font = originalFont;
-        }
-
         private void SendPawnDataToGemini()
         {
-            this.currentPrompt = "Generating data... please wait.";
-            this.currentTableData = null; // Clear old table
+            this.rawResponse = "Collecting data and sending to API... please wait.";
+            this.displayBlocks = null;
 
-            // Collect Pawn Data
             StringBuilder sb = new StringBuilder();
             foreach (Pawn pawn in Find.CurrentMap.mapPawns.FreeColonists)
             {
                 sb.AppendLine($"Name: {pawn.Name.ToStringShort}, Skills: Shooting {pawn.skills.GetSkill(SkillDefOf.Shooting).Level}, Melee {pawn.skills.GetSkill(SkillDefOf.Melee).Level}, Traits: {GetTraits(pawn)}");
             }
 
-            // Call API
-            // Note: Ensure 'GeminiAPIManager' matches your actual class name
-            GeminiAPIManager.SendRequest(sb.ToString(), OnGeminiResponse);
+            GeminiAPIManager.SendRequest(promptText, sb.ToString(), OnGeminiResponseReceived);
         }
 
         private string GetTraits(Pawn p)
@@ -149,14 +164,19 @@ namespace GeminiPawnExport
             return string.Join(", ", traits);
         }
 
-        // Callback function
-        private void OnGeminiResponse(string response)
+        private void OnGeminiResponseReceived(string response)
         {
-            this.currentPrompt = response;
-            // Parse the markdown immediately upon receiving it
-            this.currentTableData = MarkdownTableParser.Parse(response);
+            lock (responseLock)
+            {
+                pendingResponse = response;
+            }
+        }
 
-            // Reset scroll to top when new data arrives
+        private void ProcessResponse(string response)
+        {
+            this.rawResponse = response;
+            // Parse full mixed content
+            this.displayBlocks = MarkdownParser.Parse(response);
             this.scrollPosition = Vector2.zero;
         }
     }
