@@ -14,7 +14,7 @@ namespace GeminiPawnExport
         public static string GenerateReport()
         {
             StringBuilder sb = new StringBuilder();
-            sb.AppendLine("### COLONIST ROSTER - OPTIMIZED HEALTH STATUS ###");
+            sb.AppendLine("### COLONIST ROSTER ###");
 
             // --- SELECTION LOGIC ---
             // 1. Get currently selected pawns that are colonists
@@ -26,7 +26,10 @@ namespace GeminiPawnExport
             if (pawnsToAnalyze.Count == 0)
             {
                 pawnsToAnalyze = Find.CurrentMap.mapPawns.FreeColonists.ToList();
-                sb.AppendLine("(No specific colonists selected. Exporting ALL free colonists.)");
+                //Don't need to include this in the extract; instead log this point
+                //sb.AppendLine("(No specific colonists selected. Exporting ALL free colonists.)");
+                Log.Message("(No specific colonists selected. Exporting ALL free colonists.)");
+
             }
 
             foreach (Pawn p in pawnsToAnalyze)

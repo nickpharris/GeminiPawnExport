@@ -58,6 +58,26 @@ namespace GeminiPawnExport
             // --- 3. Draw Top Bar ---
             float curX = topBarRect.x;
 
+
+            //Button to copy the extracted data from Rimworld to the clipboard
+            if (Widgets.ButtonText(new Rect(curX, topBarRect.y, 120f, 30f), "Copy Extract"))
+            {
+                GUIUtility.systemCopyBuffer = GeneratePawnData();
+                Messages.Message("Copied extract to clipboard.", MessageTypeDefOf.TaskCompletion, false);
+            }
+
+            curX += 130f;
+
+            // Only visible if in Dev Mode, button to put extract into the log
+            if (Prefs.DevMode)
+            {
+                if (Widgets.ButtonText(new Rect(curX, topBarRect.y, 120f, 30f), "Log Extract"))
+                {
+                    DebugDumpData();
+                }
+                curX += 130f;
+            }
+
             // Send prompt and data to Gemini
             if (Widgets.ButtonText(new Rect(curX, topBarRect.y, 120f, 30f), "Send to Gemini"))
             {
@@ -78,17 +98,6 @@ namespace GeminiPawnExport
                 Find.WindowStack.Add(new Dialog_ModSettings(LoadedModManager.GetMod<GeminiMod>()));
             }
             curX += 130f;
-
-            // --- NEW: DEV MODE DEBUG BUTTON ---
-            // Only visible if Dev Mode is enabled in RimWorld options
-            if (Prefs.DevMode)
-            {
-                if (Widgets.ButtonText(new Rect(curX, topBarRect.y, 120f, 30f), "Debug Payload"))
-                {
-                    DebugDumpData();
-                }
-                curX += 130f;
-            }
 
             // Copy Gemini response to clipboard
             if (!string.IsNullOrEmpty(rawResponse))

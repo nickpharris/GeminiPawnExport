@@ -1,4 +1,6 @@
-﻿using Verse;
+﻿using Microsoft.SqlServer.Server;
+using RimWorld;
+using Verse;
 
 namespace GeminiPawnExport
 {
@@ -10,7 +12,8 @@ namespace GeminiPawnExport
             "Please take into account which injuries (if any) are temporary vs permanent, " +
             "and allocate based on when they have recovered their fitness from any temporary injuries. " +
             "Make any recommendations about how I should reallocate clothing / armor (inc. recon helmets) " +
-            "based on weapons strategy - considering their roles once they have recovered from any temporary battle injuries.";
+            "based on weapons strategy - considering their roles once they have recovered from any temporary battle injuries. " +
+            "Format all output using Unity Rich Text formatting; if tables are included, format those using Markdown (not HTML-style).";
 
         public string apiKey = "";
 
