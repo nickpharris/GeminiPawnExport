@@ -14,7 +14,9 @@ namespace GeminiPawnExport
         private static string defaultRawResponse = "Ready to generate.";
         private string rawResponse = defaultRawResponse;
         private List<DisplayBlock> displayBlocks;
-        private Vector2 scrollPosition = Vector2.zero;
+
+        private Vector2 analysisScrollPosition = Vector2.zero;
+        private Vector2 promptScrollPosition = Vector2.zero;
 
         // Thread-safe handling
         private object responseLock = new object();
@@ -106,7 +108,33 @@ namespace GeminiPawnExport
             Rect promptBoxRect = new Rect(inRect.x, promptLabelRect.yMax, inRect.width, 60f);
 
             Widgets.Label(promptLabelRect, "<b>Gemini Analysis Prompt:</b>");
-            promptText = Widgets.TextArea(promptBoxRect, promptText);
+            //promptText = Widgets.TextArea(promptBoxRect, promptText);
+
+            // 1. Define the visible area for the content
+            // We subtract 16f from the width to make room for the vertical scrollbar
+            float scrollViewWidth = promptBoxRect.width - 16f;
+
+            // 2. Calculate the height of the text content
+            // This determines how long the scrollable area needs to be
+            float contentHeight = Text.CalcHeight(promptText, scrollViewWidth);
+
+            // 3. Ensure the view is at least as tall as the box (prevents visual glitches if empty)
+            if (contentHeight < promptBoxRect.height) { contentHeight = promptBoxRect.height; }
+
+            // 4. Define the rectangle for the "virtual" content (the long scrollable strip)
+            Rect promptViewRect = new Rect(0f, 0f, scrollViewWidth, contentHeight);
+
+            // 5. Begin the Scroll View
+            // This uses your 'promptScrollPosition' variable to remember where the user scrolled
+            Widgets.BeginScrollView(promptBoxRect, ref promptScrollPosition, promptViewRect);
+
+            // 6. Draw the actual Text Area
+            // We draw it at (0, 0) relative to the viewRect. 
+            // We use viewRect.width/height so it fills the virtual space.
+            promptText = Widgets.TextArea(new Rect(0f, 0f, promptViewRect.width, promptViewRect.height), promptText);
+
+            // 7. End the Scroll View
+            Widgets.EndScrollView();
 
 
             //NEXT ROW: Do the buttons to send data to gemini and to reset the prompt
@@ -134,13 +162,24 @@ namespace GeminiPawnExport
             Widgets.DrawLineHorizontal(inRect.x, sendDividerY, inRect.width);
 
 
-            //Rect for the Gemini output
-            Rect outRect = new Rect(inRect.x, sendDividerY + 10f, inRect.width, inRect.height - (sendDividerY + 10f));
-
-
-
-
             // --- 5. Draw Results Area ---
+
+            //Rect for the Gemini output
+            //Rect outRect = new Rect(inRect.x, sendDividerY + 10f, inRect.width, inRect.height - (sendDividerY + 10f));
+
+
+            // Define how much space the bottom button needs
+            float bottomButtonHeight = 30f;
+            float padding = 10f;
+
+            // 2. Calculate the height available for the main output box (outRect)
+            // We take the total window height, subtract the top stuff (sendDividerY + 10f),
+            // AND subtract the space we need for the button at the bottom.
+            float outRectHeight = inRect.height - (sendDividerY + 10f) - (bottomButtonHeight + padding);
+
+            // 3. Create outRect with this shorter height
+            Rect outRect = new Rect(inRect.x, sendDividerY + 10f, inRect.width, outRectHeight);
+
 
             // Calculate content height
             float viewHeight = 0f;
@@ -161,7 +200,7 @@ namespace GeminiPawnExport
 
             Rect viewRect = new Rect(0f, 0f, viewWidth, viewHeight);
 
-            Widgets.BeginScrollView(outRect, ref scrollPosition, viewRect, true);
+            Widgets.BeginScrollView(outRect, ref analysisScrollPosition, viewRect, true);
 
             if (displayBlocks != null && displayBlocks.Count > 0)
             {
@@ -185,17 +224,19 @@ namespace GeminiPawnExport
             Widgets.EndScrollView();
 
 
-            //// Copy Gemini response to clipboard
-            //if (!string.IsNullOrEmpty(rawResponse))
-            //{
 
-            //    if (Widgets.ButtonText(new Rect(curX, topBarRect.y, 120f, 30f), "Copy Results"))
-            //    {
-            //        GUIUtility.systemCopyBuffer = rawResponse;
-            //        Messages.Message("Copied to clipboard.", MessageTypeDefOf.TaskCompletion, false);
-            //    }
-            //}
+            // Copy Gemini response to clipboard
+            if (!string.IsNullOrEmpty(rawResponse) && !string.Equals(rawResponse, defaultRawResponse))
+            {
 
+                Rect copyResultsButtonRect = new Rect(inRect.x, outRect.yMax + padding, 120f, bottomButtonHeight);
+
+                if (Widgets.ButtonText(copyResultsButtonRect, "Copy Analysis"))
+                {
+                    GUIUtility.systemCopyBuffer = rawResponse;
+                    Messages.Message("Analysis copied to clipboard.", MessageTypeDefOf.TaskCompletion, false);
+                }
+            }
 
         }
 
@@ -268,7 +309,7 @@ namespace GeminiPawnExport
             this.rawResponse = response;
             // Parse full mixed content
             this.displayBlocks = MarkdownParser.Parse(response);
-            this.scrollPosition = Vector2.zero;
+            this.analysisScrollPosition = Vector2.zero;
         }
     }
 }
