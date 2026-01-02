@@ -10,7 +10,29 @@ namespace GeminiPawnExport
     public static class GeminiAPIManager
     {
         private static readonly HttpClient client = new HttpClient();
-        private const string Endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent";
+        private const string DefaultEndpointPrefix = "https://generativelanguage.googleapis.com/v1beta/models/";
+        private const string DefaultEndpointModel = "gemini-3-flash-preview";
+        private const string DefaultEndpointSuffix = ":generateContent";
+
+
+
+        // 2. Create a static property that fetches the current setting every time it is accessed
+        private static string Endpoint
+        {
+            get
+            {
+                string modelFromSettings = GeminiMod.settings.model;
+
+                // Return the user's setting if it exists, otherwise use the default
+                if (!string.IsNullOrEmpty(modelFromSettings))
+                {
+                    return DefaultEndpointPrefix + modelFromSettings + DefaultEndpointSuffix;
+                }
+                return DefaultEndpointPrefix + DefaultEndpointModel + DefaultEndpointSuffix;
+            }
+        }
+
+
 
         /// <summary>
         /// Sends the request to Gemini asynchronously and invokes the callback on completion.

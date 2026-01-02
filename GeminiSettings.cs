@@ -15,14 +15,18 @@ namespace GeminiPawnExport
             "based on weapons strategy - considering their roles once they have recovered from any temporary battle injuries. " +
             "Format all output using Unity Rich Text formatting; if tables are included, format those using Markdown (not HTML-style).";
 
+        private const string DefaultModel = "gemini-3-flash-preview";
+
         public string apiKey = "";
 
         // 2. Initialize the field using the constant.
         public string defaultPrompt = DefaultPromptText;
+        public string model = DefaultModel;
 
         public override void ExposeData()
         {
             // The third argument is the default value used if the setting is missing in the XML file.
+            Scribe_Values.Look(ref model, "model", DefaultModel);
             Scribe_Values.Look(ref apiKey, "apiKey", "");
             Scribe_Values.Look(ref defaultPrompt, "defaultPrompt", DefaultPromptText);
 

@@ -22,9 +22,14 @@ namespace GeminiPawnExport
 
             listingStandard.Gap();
 
+            listingStandard.Label("Gemini API Model:");
+            settings.model = listingStandard.TextEntry(settings.model);
+
+            listingStandard.Gap();
+
             listingStandard.Label("Default Analysis Prompt:");
             // Increased height for prompt entry
-            settings.defaultPrompt = listingStandard.TextEntry(settings.defaultPrompt, 4);
+            settings.defaultPrompt = listingStandard.TextEntry(settings.defaultPrompt, 10);
 
             listingStandard.End();
             base.DoSettingsWindowContents(inRect);
