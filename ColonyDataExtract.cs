@@ -76,15 +76,33 @@ namespace GeminiPawnExport
                 string roleClean = Regex.Replace(roleRaw, "<[^>]+>", string.Empty);
                 sb.AppendLine($" - Role: {roleClean}");
 
-                // TODO: Seems incomplete to just have these three skills. Why not include all?
+                //Updated to add all skills
 
                 int shoot = p.skills.GetSkill(SkillDefOf.Shooting).Level;
                 int melee = p.skills.GetSkill(SkillDefOf.Melee).Level;
+                int construct = p.skills.GetSkill(SkillDefOf.Construction).Level;
+                int mining = p.skills.GetSkill(SkillDefOf.Mining).Level;
+                int cooking = p.skills.GetSkill(SkillDefOf.Cooking).Level;
+                int plants = p.skills.GetSkill(SkillDefOf.Plants).Level;
                 int animals = p.skills.GetSkill(SkillDefOf.Animals).Level;
+                int craft = p.skills.GetSkill(SkillDefOf.Crafting).Level;
+                int art = p.skills.GetSkill(SkillDefOf.Artistic).Level;
+                int medical = p.skills.GetSkill(SkillDefOf.Medicine).Level;
+                int social = p.skills.GetSkill(SkillDefOf.Social).Level;
+                int intellectual= p.skills.GetSkill(SkillDefOf.Intellectual).Level;
 
                 sb.AppendLine($" - Shooting: {shoot}");
                 sb.AppendLine($" - Melee: {melee}");
+                sb.AppendLine($" - Construction: {construct}");
+                sb.AppendLine($" - Mining: {mining}");
+                sb.AppendLine($" - Cooking: {cooking}");
+                sb.AppendLine($" - Plants: {plants}");
                 sb.AppendLine($" - Animals: {animals}");
+                sb.AppendLine($" - Crafting: {craft}");
+                sb.AppendLine($" - Artistic: {art}");
+                sb.AppendLine($" - Medical: {medical}");
+                sb.AppendLine($" - Social: {social}");
+                sb.AppendLine($" - Intellectual: {intellectual}");
 
                 float moveSpeed = p.GetStatValue(StatDefOf.MoveSpeed);
                 sb.AppendLine($" - Move Speed: {moveSpeed:F2} c/s");
