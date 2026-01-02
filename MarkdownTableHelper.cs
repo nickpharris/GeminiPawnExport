@@ -49,6 +49,15 @@ namespace GeminiPawnExport
         public List<string> Headers;
         public List<List<string>> Rows;
 
+        // Standard padding used by Widgets.Label when using ContractedBy
+        private const float CellPadding = 4f;
+
+        // Total horizontal reduction (Left + Right)
+        private const float WidthReduction = CellPadding * 2f;
+
+        // Total vertical reduction (Top + Bottom)
+        private const float HeightReduction = CellPadding * 2f;
+
         public TableBlock()
         {
             this.Type = BlockType.Table;
@@ -60,35 +69,49 @@ namespace GeminiPawnExport
         {
             if (Headers.Count == 0) return 0f;
 
+            // 1. Set font to Tiny for accurate calculation
+            GameFont originalFont = Text.Font;
+            Text.Font = GameFont.Tiny;
+
             float colWidth = width / Headers.Count;
+            // 2. Adjust width for padding (Left/Right)
+            float textWidth = colWidth - WidthReduction;
+
             float totalHeight = 30f; // Header height
 
             foreach (var row in Rows)
             {
-                float maxRowH = 24f; // Min row height
+                float maxRowH = 0f;
                 foreach (var cell in row)
                 {
-                    float h = Text.CalcHeight(cell, colWidth);
-                    if (h > maxRowH) maxRowH = h;
+                    float textH = Text.CalcHeight(cell, textWidth);
+                    if (textH > maxRowH) maxRowH = textH;
                 }
-                totalHeight += maxRowH;
+
+                // 3. CRITICAL FIX: Add vertical padding (Top/Bottom) back to the row height
+                // If text needs 50px, we need a 58px box so that after padding we still have 50px left.
+                // We also add +2f buffer for safety.
+                totalHeight += (maxRowH + HeightReduction + 2f);
             }
-            return totalHeight + 10f; // Buffer
+
+            Text.Font = originalFont;
+            return totalHeight + 10f; // Bottom buffer
         }
 
         public override void Draw(Rect outRect)
         {
             if (Headers.Count == 0) return;
 
-            // Save font
             GameFont originalFont = Text.Font;
             Text.Font = GameFont.Tiny;
 
             int colCount = Headers.Count;
             float colWidth = outRect.width / colCount;
+            float textWidth = colWidth - WidthReduction;
+
             float currentY = outRect.y;
 
-            // 1. Draw Headers
+            // --- Draw Headers ---
             float headerHeight = 30f;
             for (int i = 0; i < colCount; i++)
             {
@@ -105,32 +128,39 @@ namespace GeminiPawnExport
             currentY += headerHeight;
             Widgets.DrawLineHorizontal(outRect.x, currentY, outRect.width);
 
-            // 2. Draw Rows
+            // --- Draw Rows ---
             foreach (var row in Rows)
             {
-                // Calc height for this specific row
-                float rowHeight = 24f;
+                // 1. Recalculate the required text height for this row
+                float maxTextH = 0f;
                 for (int i = 0; i < row.Count && i < colCount; i++)
                 {
-                    float h = Text.CalcHeight(row[i], colWidth);
-                    if (h > rowHeight) rowHeight = h;
+                    float h = Text.CalcHeight(row[i], textWidth);
+                    if (h > maxTextH) maxTextH = h;
                 }
 
-                // Draw cells
+                // 2. Apply the same vertical expansion (Text Height + Padding + Safety Buffer)
+                float finalRowHeight = maxTextH + HeightReduction + 2f;
+
+                // 3. Draw Cells
                 for (int i = 0; i < row.Count && i < colCount; i++)
                 {
-                    Rect cellRect = new Rect(outRect.x + (i * colWidth), currentY, colWidth, rowHeight);
-                    Widgets.Label(cellRect.ContractedBy(4f), row[i]);
-                    Widgets.DrawLineVertical(cellRect.x + cellRect.width, cellRect.y, rowHeight);
+                    Rect cellRect = new Rect(outRect.x + (i * colWidth), currentY, colWidth, finalRowHeight);
+
+                    // ContractedBy(4f) will remove the padding we just added, leaving exact space for text
+                    Widgets.Label(cellRect.ContractedBy(CellPadding), row[i]);
+
+                    Widgets.DrawLineVertical(cellRect.x + cellRect.width, cellRect.y, finalRowHeight);
                 }
 
-                currentY += rowHeight;
+                currentY += finalRowHeight;
                 Widgets.DrawLineHorizontal(outRect.x, currentY, outRect.width);
             }
 
             Text.Font = originalFont;
         }
     }
+
 
     // --- Parser ---
 
@@ -203,6 +233,7 @@ namespace GeminiPawnExport
 
         private static TextBlock CreateTextBlock(List<string> lines)
         {
+
             // Join with newline. Since 'lines' now includes empty strings for blank lines,
             // this will create double newlines (\n\n) where appropriate.
             string raw = string.Join("\n", lines);
@@ -220,6 +251,9 @@ namespace GeminiPawnExport
 
             // Headers ## Header -> Size 16 Bold
             processed = Regex.Replace(processed, @"^#+\s+(.*)", "<b><size=16>$1</size></b>", RegexOptions.Multiline);
+
+            //Special case - Rimworld doesn't seem to parse <br>, so replaced with nl character
+            processed = processed.Replace("<br>", "\n").Replace("<br/>", "\n");
 
             return new TextBlock(processed);
         }
@@ -256,7 +290,10 @@ namespace GeminiPawnExport
         private static string CleanCell(string raw)
         {
             string clean = raw.Trim();
+
             clean = clean.Replace("**", "");
+            clean = clean.Replace("<br>", "\n").Replace("<br/>", "\n");
+
             return clean;
         }
     }
