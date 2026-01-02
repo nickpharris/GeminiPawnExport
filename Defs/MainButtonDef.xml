@@ -4,7 +4,7 @@
 		<defName>GeminiExport_MainButton</defName>
 		<label>Gemini</label>
 		<description>Export colonist data for analysis.</description>
-		<tabWindowClass>MyRimWorldMod.MainTabWindow_GeminiExport</tabWindowClass>
+		<tabWindowClass>GeminiPawnExport.MainTabWindow_GeminiExport</tabWindowClass>
 		<order>99</order>
 	</MainButtonDef>
 </Defs>

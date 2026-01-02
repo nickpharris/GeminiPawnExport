@@ -1,0 +1,315 @@
+﻿using RimWorld;
+using System.Collections.Generic;
+using System.Net;
+using System.Text;
+using UnityEngine;
+using Verse;
+
+namespace GeminiPawnExport
+{
+    public class MainTabWindow_GeminiExport : MainTabWindow
+    {
+        // UI State
+        private string promptText = "";
+        private static string defaultRawResponse = "Ready to generate.";
+        private string rawResponse = defaultRawResponse;
+        private List<DisplayBlock> displayBlocks;
+
+        private Vector2 analysisScrollPosition = Vector2.zero;
+        private Vector2 promptScrollPosition = Vector2.zero;
+
+        // Thread-safe handling
+        private object responseLock = new object();
+        private string pendingResponse = null;
+
+        public override Vector2 InitialSize => new Vector2(800f, 600f);
+
+        public override void PreOpen()
+        {
+            base.PreOpen();
+            // Load the default prompt from settings when the window opens
+            if (string.IsNullOrEmpty(promptText))
+            {
+                promptText = GeminiMod.settings.defaultPrompt;
+            }
+        }
+
+        public override void DoWindowContents(Rect inRect)
+        {
+            // --- 1. Handle Async Responses (Thread Safety) ---
+            string newResponse = null;
+            lock (responseLock)
+            {
+                if (pendingResponse != null)
+                {
+                    newResponse = pendingResponse;
+                    pendingResponse = null;
+                }
+            }
+            if (newResponse != null) ProcessResponse(newResponse);
+
+
+            // --- 2. Layout Definitions ---
+
+            //Rect for the buttons at the top
+            //Rect topBarRect = new Rect(inRect.x, inRect.y, inRect.width, 30f);
+
+            //Rect for the prompt label
+            //Rect promptLabelRect = new Rect(inRect.x, topBarRect.yMax + 10f, inRect.width, 20f);
+
+            //Rect for the prompt text
+            //Rect promptBoxRect = new Rect(inRect.x, promptLabelRect.yMax, inRect.width, 60f);
+
+            //Y position for divider below the prompt rect
+            //float dividerY = promptBoxRect.yMax + 10f;
+
+
+
+            // --- 3. Draw Top Bar ---
+            Rect topBarRect = new Rect(inRect.x, inRect.y, inRect.width, 30f);
+
+            float curX = topBarRect.x;
+
+            //Button to copy the extracted data from Rimworld to the clipboard
+            if (Widgets.ButtonText(new Rect(curX, topBarRect.y, 120f, 30f), "Copy Extract"))
+            {
+                GUIUtility.systemCopyBuffer = GeneratePawnData();
+                Messages.Message("Copied extract to clipboard.", MessageTypeDefOf.TaskCompletion, false);
+            }
+
+            //This is the button width, plus a gap of 10f
+            curX += 130f;
+
+            // Only visible if in Dev Mode, button to put extract into the log
+            if (Prefs.DevMode)
+            {
+                if (Widgets.ButtonText(new Rect(curX, topBarRect.y, 120f, 30f), "Log Extract"))
+                {
+                    DebugDumpData();
+                }
+                curX += 130f;
+            }
+
+            // Open mod settings
+            //if (Widgets.ButtonText(new Rect(curX, topBarRect.y, 120f, 30f), "Settings"))
+            if (Widgets.ButtonText(new Rect(topBarRect.xMax - 120f, topBarRect.y, 120f, 30f), "Settings"))
+                {
+                    Find.WindowStack.Add(new Dialog_ModSettings(LoadedModManager.GetMod<GeminiMod>()));
+            }
+
+
+            //NEXT ROW:Draw divider line below extract buttons
+            float extractDividerY = topBarRect.yMax + 10f;
+            Widgets.DrawLineHorizontal(inRect.x, extractDividerY, inRect.width);
+
+
+            //NEXT ROW: Draw the Rect for the prompt label and the prompt text
+            Rect promptLabelRect = new Rect(inRect.x, extractDividerY + 10f, inRect.width, 20f);
+            Rect promptBoxRect = new Rect(inRect.x, promptLabelRect.yMax, inRect.width, 60f);
+
+            Widgets.Label(promptLabelRect, "<b>Gemini Analysis Prompt:</b>");
+            //promptText = Widgets.TextArea(promptBoxRect, promptText);
+
+            // 1. Define the visible area for the content
+            // We subtract 16f from the width to make room for the vertical scrollbar
+            float scrollViewWidth = promptBoxRect.width - 16f;
+
+            // 2. Calculate the height of the text content
+            // This determines how long the scrollable area needs to be
+            float contentHeight = Text.CalcHeight(promptText, scrollViewWidth);
+
+            // 3. Ensure the view is at least as tall as the box (prevents visual glitches if empty)
+            if (contentHeight < promptBoxRect.height) { contentHeight = promptBoxRect.height; }
+
+            // 4. Define the rectangle for the "virtual" content (the long scrollable strip)
+            Rect promptViewRect = new Rect(0f, 0f, scrollViewWidth, contentHeight);
+
+            // 5. Begin the Scroll View
+            // This uses your 'promptScrollPosition' variable to remember where the user scrolled
+            Widgets.BeginScrollView(promptBoxRect, ref promptScrollPosition, promptViewRect);
+
+            // 6. Draw the actual Text Area
+            // We draw it at (0, 0) relative to the viewRect. 
+            // We use viewRect.width/height so it fills the virtual space.
+            promptText = Widgets.TextArea(new Rect(0f, 0f, promptViewRect.width, promptViewRect.height), promptText);
+
+            // 7. End the Scroll View
+            Widgets.EndScrollView();
+
+
+            //NEXT ROW: Do the buttons to send data to gemini and to reset the prompt
+
+            //Reset the X position for the buttons
+            curX = topBarRect.x;
+
+            // Send prompt and data to Gemini
+            if (Widgets.ButtonText(new Rect(curX, promptBoxRect.yMax + 10f, 120f, 30f), "Send to Gemini"))
+            {
+                SendPawnDataToGemini();
+            }
+            curX += 130f;
+
+            // Reset to default prompt
+            if (Widgets.ButtonText(new Rect(topBarRect.xMax - 120f, promptBoxRect.yMax + 10f, 120f, 30f), "Reset Prompt"))
+            {
+                promptText = GeminiMod.settings.defaultPrompt;
+                this.rawResponse = defaultRawResponse;
+                this.displayBlocks = null;
+            }
+
+            //NEXT ROW:Draw divider line below send to Gemini buttons (before the Gemini output)
+            float sendDividerY = promptBoxRect.yMax + 10f + 30f + 10f;
+            Widgets.DrawLineHorizontal(inRect.x, sendDividerY, inRect.width);
+
+
+            // --- 5. Draw Results Area ---
+
+            //Rect for the Gemini output
+            //Rect outRect = new Rect(inRect.x, sendDividerY + 10f, inRect.width, inRect.height - (sendDividerY + 10f));
+
+
+            // Define how much space the bottom button needs
+            float bottomButtonHeight = 30f;
+            float padding = 10f;
+
+            // 2. Calculate the height available for the main output box (outRect)
+            // We take the total window height, subtract the top stuff (sendDividerY + 10f),
+            // AND subtract the space we need for the button at the bottom.
+            float outRectHeight = inRect.height - (sendDividerY + 10f) - (bottomButtonHeight + padding);
+
+            // 3. Create outRect with this shorter height
+            Rect outRect = new Rect(inRect.x, sendDividerY + 10f, inRect.width, outRectHeight);
+
+
+            // Calculate content height
+            float viewHeight = 0f;
+            float viewWidth = outRect.width - 16f; // Account for scrollbar
+
+            if (displayBlocks != null && displayBlocks.Count > 0)
+            {
+                foreach (var block in displayBlocks)
+                {
+                    viewHeight += block.CalculateHeight(viewWidth);
+                    viewHeight += 10f; // Gap between blocks
+                }
+            }
+            else
+            {
+                viewHeight = Text.CalcHeight(rawResponse, viewWidth) + 20f;
+            }
+
+            Rect viewRect = new Rect(0f, 0f, viewWidth, viewHeight);
+
+            Widgets.BeginScrollView(outRect, ref analysisScrollPosition, viewRect, true);
+
+            if (displayBlocks != null && displayBlocks.Count > 0)
+            {
+                float curY = 0f;
+                foreach (var block in displayBlocks)
+                {
+                    float h = block.CalculateHeight(viewWidth);
+                    Rect blockRect = new Rect(0f, curY, viewWidth, h);
+
+                    block.Draw(blockRect);
+
+                    curY += h + 10f; // Add gap
+                }
+            }
+            else
+            {
+                // Fallback for raw text or status messages
+                Widgets.Label(viewRect, rawResponse);
+            }
+
+            Widgets.EndScrollView();
+
+
+
+            // Copy Gemini response to clipboard
+            if (!string.IsNullOrEmpty(rawResponse) && !string.Equals(rawResponse, defaultRawResponse))
+            {
+
+                Rect copyResultsButtonRect = new Rect(inRect.x, outRect.yMax + padding, 120f, bottomButtonHeight);
+
+                if (Widgets.ButtonText(copyResultsButtonRect, "Copy Analysis"))
+                {
+                    GUIUtility.systemCopyBuffer = rawResponse;
+                    Messages.Message("Analysis copied to clipboard.", MessageTypeDefOf.TaskCompletion, false);
+                }
+            }
+
+        }
+
+        private void SendPawnDataToGemini()
+        {
+            this.rawResponse = "Collecting data and sending to API... please wait.";
+            this.displayBlocks = null;
+
+            // CHANGED: Use the helper method to get data
+            string pawnData = GeneratePawnData();
+
+            GeminiAPIManager.SendRequest(promptText, pawnData, OnGeminiResponseReceived);
+        }
+
+        // --- NEW Helper Method to Generate Data ---
+        // extracted from SendPawnDataToGemini so the Debug button can reuse it
+        private string GeneratePawnData()
+        {
+            //Use the new helper class (brought back from the original implementation)
+            return GeminiExporter.GenerateReport();
+
+            //StringBuilder sb = new StringBuilder();
+            //foreach (Pawn pawn in Find.CurrentMap.mapPawns.FreeColonists)
+            //{
+            //    sb.AppendLine($"Name: {pawn.Name.ToStringShort}, Skills: Shooting {pawn.skills.GetSkill(SkillDefOf.Shooting).Level}, Melee {pawn.skills.GetSkill(SkillDefOf.Melee).Level}, Traits: {GetTraits(pawn)}");
+            //}
+            //return sb.ToString();
+        }
+
+        // --- NEW Debug Action ---
+        private void DebugDumpData()
+        {
+            string data = GeneratePawnData();
+
+            // Log to RimWorld Console (Dev Log)
+            Log.Message("<b>[GeminiExport] Generated Payload:</b>\n" + data);
+
+            // Show a small notification so you know it happened
+            Messages.Message("Payload logged to Dev Console.", MessageTypeDefOf.TaskCompletion, false);
+        }
+
+        //private string GetTraits(Pawn p)
+        //{
+        //    if (p.story == null || p.story.traits == null) return "";
+        //    List<string> traits = new List<string>();
+        //    foreach (var t in p.story.traits.allTraits)
+        //    {
+        //        traits.Add(t.Label);
+        //    }
+        //    return string.Join(", ", traits);
+        //}
+
+        private void OnGeminiResponseReceived(string response)
+        {
+            lock (responseLock)
+            {
+                pendingResponse = response;
+            }
+        }
+
+        private void ProcessResponse(string response)
+        {
+
+            //If dev mode is on, dump the raw response to the log
+            if (Prefs.DevMode)
+            {
+                Log.Message("Raw response from Gemini:\n" + response);
+            }
+
+            this.rawResponse = response;
+            // Parse full mixed content
+            this.displayBlocks = MarkdownParser.Parse(response);
+            this.analysisScrollPosition = Vector2.zero;
+        }
+    }
+}

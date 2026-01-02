@@ -1,70 +1,72 @@
-﻿using LudeonTK;
-using RimWorld;
+﻿using RimWorld;
+using RimWorld.Planet; // Required for accessing WorldObjects/Caravans
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
-using UnityEngine; // Needed for GUI and Clipboard
+using System.Threading.Tasks;
 using Verse;
 
-namespace MyRimWorldMod
+namespace GeminiPawnExport
 {
-    // ------------------------------------------------------------------
-    // 1. THE UI WINDOW
-    // ------------------------------------------------------------------
-    public class MainTabWindow_GeminiExport : MainTabWindow
-    {
-        // Define the size of the window
-        public override Vector2 RequestedTabSize => new Vector2(300f, 160f);
-
-        public override void DoWindowContents(Rect inRect)
-        {
-            // Title
-            Text.Font = GameFont.Medium;
-            Widgets.Label(new Rect(0, 0, inRect.width, 30f), "Gemini Export");
-            Text.Font = GameFont.Small;
-
-            // Button 1: Export Selected / All to Clipboard
-            if (Widgets.ButtonText(new Rect(0, 40f, inRect.width, 40f), "Copy to Clipboard"))
-            {
-                string report = GeminiExporter.GenerateReport();
-                GUIUtility.systemCopyBuffer = report; // Copies to system clipboard
-                Messages.Message("Colonist data copied to clipboard!", MessageTypeDefOf.PositiveEvent, false);
-            }
-
-            // Button 2: Export to Debug Log (Old method)
-            if (Widgets.ButtonText(new Rect(0, 90f, inRect.width, 40f), "Print to Debug Log"))
-            {
-                string report = GeminiExporter.GenerateReport();
-                Log.Message(report);
-                Messages.Message("Colonist data printed to log.", MessageTypeDefOf.NeutralEvent, false);
-            }
-        }
-    }
-
-    // ------------------------------------------------------------------
-    // 2. THE EXPORT LOGIC
-    // ------------------------------------------------------------------
     public static class GeminiExporter
     {
         public static string GenerateReport()
         {
             StringBuilder sb = new StringBuilder();
-            sb.AppendLine("### COLONIST ROSTER - OPTIMIZED HEALTH STATUS ###");
+            sb.AppendLine("### COLONIST ROSTER ###");
 
-            // --- SELECTION LOGIC ---
-            // 1. Get currently selected pawns that are colonists
+            //// --- SELECTION LOGIC ---
+            //// 1. Get currently selected pawns that are colonists
+            //List<Pawn> pawnsToAnalyze = Find.Selector.SelectedPawns
+            //    .Where(p => p.IsColonist && p.Map == Find.CurrentMap)
+            //    .ToList();
+
+            //// 2. If NONE are selected, fallback to ALL free colonists on the map
+            //if (pawnsToAnalyze.Count == 0)
+            //{
+            //    pawnsToAnalyze = Find.CurrentMap.mapPawns.FreeColonists.ToList();
+            //    //Don't need to include this in the extract; instead log this point
+            //    //sb.AppendLine("(No specific colonists selected. Exporting ALL free colonists.)");
+            //    Log.Message("(No specific colonists selected. Exporting ALL free colonists.)");
+
+            //}
+
+
+            // --- SELECTION LOGIC - Updated to include colonist pawns who are in caravans ---
+
+            // TODO: Make map-only vs whole world pawn selection configurable
+            // TODO: Should I change the logic so it always picks all pawns for the extract (whether any are selected or not)? Avoid problem of accidentaly analyzing just one selected pawn.
+
+            // 1. Get currently selected pawns (excluding the "CurrentMap" condition
             List<Pawn> pawnsToAnalyze = Find.Selector.SelectedPawns
-                .Where(p => p.IsColonist && p.Map == Find.CurrentMap)
+                .Where(p => p.IsColonist)
                 .ToList();
 
-            // 2. If NONE are selected, fallback to ALL free colonists on the map
+            // 2. If NONE are selected, fallback to ALL free colonists (Current Map + Caravans)
             if (pawnsToAnalyze.Count == 0)
             {
-                pawnsToAnalyze = Find.CurrentMap.mapPawns.FreeColonists.ToList();
-                sb.AppendLine("(No specific colonists selected. Exporting ALL free colonists.)");
+                // A. Add colonists from the current map
+                if (Find.CurrentMap != null)
+                {
+                    pawnsToAnalyze.AddRange(Find.CurrentMap.mapPawns.FreeColonists);
+                }
+
+                // B. Add colonists from active Caravans
+                // We look at all Caravans in the world, flatten their pawn lists, and filter for colonists.
+                var caravanPawns = Find.WorldObjects.Caravans
+                    .SelectMany(c => c.PawnsListForReading)
+                    .Where(p => p.IsColonist);
+
+                pawnsToAnalyze.AddRange(caravanPawns);
+
+                // Remove duplicates just in case (e.g. if a mod puts a pawn in two lists)
+                pawnsToAnalyze = pawnsToAnalyze.Distinct().ToList();
+
+                Log.Message($"(No specific colonists selected. Exporting all {pawnsToAnalyze.Count} colonists from Map and Caravans.)");
             }
+
 
             foreach (Pawn p in pawnsToAnalyze)
             {
@@ -73,6 +75,8 @@ namespace MyRimWorldMod
                 string roleRaw = p.MainDesc(true);
                 string roleClean = Regex.Replace(roleRaw, "<[^>]+>", string.Empty);
                 sb.AppendLine($" - Role: {roleClean}");
+
+                // TODO: Seems incomplete to just have these three skills. Why not include all?
 
                 int shoot = p.skills.GetSkill(SkillDefOf.Shooting).Level;
                 int melee = p.skills.GetSkill(SkillDefOf.Melee).Level;
@@ -202,4 +206,5 @@ namespace MyRimWorldMod
             return (h is Hediff_AddedPart || h is Hediff_Implant || h.def.chronic || (h is Hediff_Injury i && i.IsPermanent()) || h is Hediff_MissingPart);
         }
     }
+
 }
