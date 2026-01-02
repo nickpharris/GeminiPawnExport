@@ -1,5 +1,6 @@
 ﻿using RimWorld;
 using System.Collections.Generic;
+using System.Net;
 using System.Text;
 using UnityEngine;
 using Verse;
@@ -10,7 +11,8 @@ namespace GeminiPawnExport
     {
         // UI State
         private string promptText = "";
-        private string rawResponse = "Ready to generate.";
+        private static string defaultRawResponse = "Ready to generate.";
+        private string rawResponse = defaultRawResponse;
         private List<DisplayBlock> displayBlocks;
         private Vector2 scrollPosition = Vector2.zero;
 
@@ -46,18 +48,25 @@ namespace GeminiPawnExport
 
 
             // --- 2. Layout Definitions ---
-            Rect topBarRect = new Rect(inRect.x, inRect.y, inRect.width, 30f);
 
-            Rect promptLabelRect = new Rect(inRect.x, topBarRect.yMax + 10f, inRect.width, 20f);
-            Rect promptBoxRect = new Rect(inRect.x, promptLabelRect.yMax, inRect.width, 60f);
+            //Rect for the buttons at the top
+            //Rect topBarRect = new Rect(inRect.x, inRect.y, inRect.width, 30f);
 
-            float dividerY = promptBoxRect.yMax + 10f;
-            Rect outRect = new Rect(inRect.x, dividerY + 10f, inRect.width, inRect.height - (dividerY + 10f));
+            //Rect for the prompt label
+            //Rect promptLabelRect = new Rect(inRect.x, topBarRect.yMax + 10f, inRect.width, 20f);
+
+            //Rect for the prompt text
+            //Rect promptBoxRect = new Rect(inRect.x, promptLabelRect.yMax, inRect.width, 60f);
+
+            //Y position for divider below the prompt rect
+            //float dividerY = promptBoxRect.yMax + 10f;
+
 
 
             // --- 3. Draw Top Bar ---
-            float curX = topBarRect.x;
+            Rect topBarRect = new Rect(inRect.x, inRect.y, inRect.width, 30f);
 
+            float curX = topBarRect.x;
 
             //Button to copy the extracted data from Rimworld to the clipboard
             if (Widgets.ButtonText(new Rect(curX, topBarRect.y, 120f, 30f), "Copy Extract"))
@@ -66,6 +75,7 @@ namespace GeminiPawnExport
                 Messages.Message("Copied extract to clipboard.", MessageTypeDefOf.TaskCompletion, false);
             }
 
+            //This is the button width, plus a gap of 10f
             curX += 130f;
 
             // Only visible if in Dev Mode, button to put extract into the log
@@ -78,44 +88,59 @@ namespace GeminiPawnExport
                 curX += 130f;
             }
 
+            // Open mod settings
+            //if (Widgets.ButtonText(new Rect(curX, topBarRect.y, 120f, 30f), "Settings"))
+            if (Widgets.ButtonText(new Rect(topBarRect.xMax - 120f, topBarRect.y, 120f, 30f), "Settings"))
+                {
+                    Find.WindowStack.Add(new Dialog_ModSettings(LoadedModManager.GetMod<GeminiMod>()));
+            }
+
+
+            //NEXT ROW:Draw divider line below extract buttons
+            float extractDividerY = topBarRect.yMax + 10f;
+            Widgets.DrawLineHorizontal(inRect.x, extractDividerY, inRect.width);
+
+
+            //NEXT ROW: Draw the Rect for the prompt label and the prompt text
+            Rect promptLabelRect = new Rect(inRect.x, extractDividerY + 10f, inRect.width, 20f);
+            Rect promptBoxRect = new Rect(inRect.x, promptLabelRect.yMax, inRect.width, 60f);
+
+            Widgets.Label(promptLabelRect, "<b>Gemini Analysis Prompt:</b>");
+            promptText = Widgets.TextArea(promptBoxRect, promptText);
+
+
+            //NEXT ROW: Do the buttons to send data to gemini and to reset the prompt
+
+            //Reset the X position for the buttons
+            curX = topBarRect.x;
+
             // Send prompt and data to Gemini
-            if (Widgets.ButtonText(new Rect(curX, topBarRect.y, 120f, 30f), "Send to Gemini"))
+            if (Widgets.ButtonText(new Rect(curX, promptBoxRect.yMax + 10f, 120f, 30f), "Send to Gemini"))
             {
                 SendPawnDataToGemini();
             }
             curX += 130f;
 
             // Reset to default prompt
-            if (Widgets.ButtonText(new Rect(curX, topBarRect.y, 120f, 30f), "Reset Prompt"))
+            if (Widgets.ButtonText(new Rect(topBarRect.xMax - 120f, promptBoxRect.yMax + 10f, 120f, 30f), "Reset Prompt"))
             {
                 promptText = GeminiMod.settings.defaultPrompt;
-            }
-            curX += 130f;
-
-            // Open mod settings
-            if (Widgets.ButtonText(new Rect(curX, topBarRect.y, 120f, 30f), "Settings"))
-            {
-                Find.WindowStack.Add(new Dialog_ModSettings(LoadedModManager.GetMod<GeminiMod>()));
-            }
-            curX += 130f;
-
-            // Copy Gemini response to clipboard
-            if (!string.IsNullOrEmpty(rawResponse))
-            {
-
-                if (Widgets.ButtonText(new Rect(curX, topBarRect.y, 120f, 30f), "Copy Results"))
-                {
-                    GUIUtility.systemCopyBuffer = rawResponse;
-                    Messages.Message("Copied to clipboard.", MessageTypeDefOf.TaskCompletion, false);
-                }
+                this.rawResponse = defaultRawResponse;
+                this.displayBlocks = null;
             }
 
-            // --- 4. Draw Prompt Input ---
-            Widgets.Label(promptLabelRect, "<b>Analysis Prompt:</b>");
-            promptText = Widgets.TextArea(promptBoxRect, promptText);
+            //NEXT ROW:Draw divider line below send to Gemini buttons (before the Gemini output)
+            float sendDividerY = promptBoxRect.yMax + 10f + 30f + 10f;
+            Widgets.DrawLineHorizontal(inRect.x, sendDividerY, inRect.width);
+
+
+            //Rect for the Gemini output
+            Rect outRect = new Rect(inRect.x, sendDividerY + 10f, inRect.width, inRect.height - (sendDividerY + 10f));
+
+
+
 
             // --- 5. Draw Results Area ---
-            Widgets.DrawLineHorizontal(inRect.x, dividerY, inRect.width);
 
             // Calculate content height
             float viewHeight = 0f;
@@ -158,6 +183,20 @@ namespace GeminiPawnExport
             }
 
             Widgets.EndScrollView();
+
+
+            //// Copy Gemini response to clipboard
+            //if (!string.IsNullOrEmpty(rawResponse))
+            //{
+
+            //    if (Widgets.ButtonText(new Rect(curX, topBarRect.y, 120f, 30f), "Copy Results"))
+            //    {
+            //        GUIUtility.systemCopyBuffer = rawResponse;
+            //        Messages.Message("Copied to clipboard.", MessageTypeDefOf.TaskCompletion, false);
+            //    }
+            //}
+
+
         }
 
         private void SendPawnDataToGemini()
