@@ -1,6 +1,4 @@
-﻿using Microsoft.SqlServer.Server;
-using RimWorld;
-using Verse;
+﻿using Verse;
 
 namespace GeminiPawnExport
 {
@@ -10,9 +8,9 @@ namespace GeminiPawnExport
         private const string DefaultPromptText =
             "In Rimworld, how should I optimally allocate all of my weapons to all of my pawns. " +
             "Please take into account which injuries (if any) are temporary vs permanent, " +
-            "and allocate based on when they have recovered their fitness from any temporary injuries. " +
+            "and allocate based on when they have recovered their fitness from any temporary injuries. \n\n" +
             "Make any recommendations about how I should reallocate clothing / armor (inc. recon helmets) " +
-            "based on weapons strategy - considering their roles once they have recovered from any temporary battle injuries. " +
+            "based on weapons strategy - considering their roles once they have recovered from any temporary battle injuries. \n\n" +
             "Format all output using Unity Rich Text formatting; if tables are included, format those using Markdown (not HTML-style).";
 
         private const string DefaultModel = "gemini-3-flash-preview";

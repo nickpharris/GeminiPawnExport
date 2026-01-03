@@ -2,8 +2,8 @@
 <Defs>
 	<MainButtonDef>
 		<defName>GeminiExport_MainButton</defName>
-		<label>Gemini</label>
-		<description>Export colonist data for analysis.</description>
+		<label>Extract</label>
+		<description>Extract and analyze colonist and colony data</description>
 		<tabWindowClass>GeminiPawnExport.MainTabWindow_GeminiExport</tabWindowClass>
 		<order>99</order>
 	</MainButtonDef>
