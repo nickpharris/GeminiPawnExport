@@ -69,7 +69,7 @@
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>:: 1. Set your RimWorld Mod Directory Variable (CHANGE THIS PATH!)
-set MOD_DIR="C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\GeminiExport"
+set MOD_DIR="C:\Program Files (x86)\Steam\steamapps\common\RimWorld\Mods\Extract&amp;Analyze"
 
 :: 2. Copy the compiled DLLs (The code)
 xcopy /y /q "$(TargetDir)*.dll" %25MOD_DIR%25\Assemblies\
